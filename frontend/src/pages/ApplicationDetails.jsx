@@ -188,9 +188,6 @@ const ApplicationDetails = () => {
     }
   };
 
-  // use shared date util
-  import { formatDateLong } from '../utils/date';
-
   if (loading) {
     return <LoadingSpinner message="Fetching details..." />;
   }

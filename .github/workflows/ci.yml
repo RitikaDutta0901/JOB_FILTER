@@ -52,11 +52,11 @@ jobs:
         working-directory: backend
         env:
           NODE_ENV: test
-          PGHOST: localhost
-          PGUSER: postgres
-          PGPASSWORD: postgres
-          PGPORT: 5432
-          PGDATABASE: job_tracker_db_test
+          DB_HOST: localhost
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_PORT: 5432
+          DB_DATABASE: job_tracker_db_test
           JWT_SECRET: test_jwt_secret_key
         run: |
           npm test -- --coverage --runInBand

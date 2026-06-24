@@ -58,7 +58,7 @@ const validateApplication = (req, res, next) => {
   const { companyName, jobTitle, status, workMode, salary, appliedDate } = req.body;
   const errors = {};
 
-  if (!companyName || companyName.trim() === '') {
+  if (companyName !== undefined && companyName.trim() === '') {
     errors.companyName = 'Company name is required';
   }
 
@@ -67,7 +67,7 @@ const validateApplication = (req, res, next) => {
   }
 
   const validStatuses = ['Applied', 'Shortlisted', 'OA', 'Interview', 'Offer', 'Rejected', 'Withdrawn'];
-  if (!status || !validStatuses.includes(status)) {
+  if (status && !validStatuses.includes(status)) {
     errors.status = `Status must be one of: ${validStatuses.join(', ')}`;
   }
 
