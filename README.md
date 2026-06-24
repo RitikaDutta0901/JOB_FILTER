@@ -70,9 +70,11 @@ The relational database is built using **PostgreSQL** with a fully normalized de
 ### Prerequisites
 - Node.js (v18+)
 - PostgreSQL (v14+)
+- Docker (optional, for containerized runs)
 
-### 1. Database Setup
-Ensure PostgreSQL is running, then run:
+### 1. Database Setup (local)
+Start Postgres and create the database, then run migrations and seed data:
+
 ```bash
 createdb job_tracker_db
 psql -d job_tracker_db -f database/schema.sql
@@ -80,17 +82,26 @@ psql -d job_tracker_db -f database/seed.sql
 ```
 
 ### 2. Backend Setup
+
 ```bash
 cd backend
 npm install
-cp ../.env.example .env
-# Edit .env file with your local database username and password
+cp .env.example .env
+# Update .env with your DB credentials and JWT secret
 npm run dev
 ```
 
 ### 3. Frontend Setup
+
 ```bash
 cd frontend
 npm install
 npm run dev
+```
+
+### Docker (optional)
+Build and run containers using the provided `docker-compose.yml`:
+
+```bash
+docker-compose up --build
 ```

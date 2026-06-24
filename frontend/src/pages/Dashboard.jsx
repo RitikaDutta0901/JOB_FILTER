@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { applicationService } from '../services/api';
 import ApplicationCard from '../components/ApplicationCard';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useAuth } from '../context/AuthContext';
 import { Search, Filter, ArrowUpDown, Briefcase, Plus, RefreshCw, XCircle } from 'lucide-react';
 
 const Dashboard = () => {
@@ -17,10 +18,44 @@ const Dashboard = () => {
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
 
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
   // Debounced Search or Manual Fetch triggers
   useEffect(() => {
+    // Wait until auth initialization completes
+    if (authLoading) return;
+    // If not authenticated, do not attempt to fetch applications
+    if (!isAuthenticated) {
+      setLoading(false);
+      setApplications([]);
+      return;
+    }
+
     fetchApplications();
-  }, [status, workMode, sortBy, sortOrder]);
+  }, [status, workMode, sortBy, sortOrder, isAuthenticated, authLoading]);
+
+  // Debounce search input to avoid excessive API calls
+  const searchDebounceRef = useRef(null);
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
+    // Clear previous timer
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    // If search empty, fetch immediately (to reset filters)
+    if (!search.trim()) {
+      fetchApplications();
+      return;
+    }
+    // Only debounce when user types; require min 2 chars to avoid noisy queries
+    if (search.trim().length < 2) return;
+
+    searchDebounceRef.current = setTimeout(() => {
+      fetchApplications();
+    }, 600);
+
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [search]);
 
   const fetchApplications = async () => {
     setLoading(true);

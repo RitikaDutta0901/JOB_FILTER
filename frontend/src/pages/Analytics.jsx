@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { applicationService } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useAuth } from '../context/AuthContext';
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend
@@ -12,9 +13,18 @@ const Analytics = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
   useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      setLoading(false);
+      setStats(null);
+      setError('User not authenticated');
+      return;
+    }
     fetchStats();
-  }, []);
+  }, [isAuthenticated, authLoading]);
 
   const fetchStats = async () => {
     setLoading(true);

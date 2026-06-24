@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { applicationService, roundService } from '../services/api';
 import api from '../services/api'; // for direct notes custom endpoint mapping
@@ -9,10 +10,12 @@ import {
   ArrowLeft, Edit3, Trash2, Calendar, MapPin, DollarSign, Globe, FileText,
   Plus, X, Check, Clock, AlertCircle, Building2
 } from 'lucide-react';
+import { formatDateLong } from '../utils/date';
 
 const ApplicationDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   
   // Data State
   const [application, setApplication] = useState(null);
@@ -39,8 +42,13 @@ const ApplicationDetails = () => {
   const [roundSubmitting, setRoundSubmitting] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
     fetchData();
-  }, [id]);
+  }, [id, isAuthenticated, authLoading, navigate]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -180,14 +188,8 @@ const ApplicationDetails = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
+  // use shared date util
+  import { formatDateLong } from '../utils/date';
 
   if (loading) {
     return <LoadingSpinner message="Fetching details..." />;
@@ -301,7 +303,7 @@ const ApplicationDetails = () => {
                 <div>
                   <p className="text-xs text-gray-500">Applied Date</p>
                   <span className="text-gray-200 font-medium">
-                    {formatDate(application.applied_date)}
+                    {formatDateLong(application.applied_date)}
                   </span>
                 </div>
               </div>
@@ -311,7 +313,7 @@ const ApplicationDetails = () => {
                 <div>
                   <p className="text-xs text-gray-500">Deadline</p>
                   <span className="text-gray-200 font-medium">
-                    {application.deadline ? formatDate(application.deadline) : 'N/A'}
+                    {application.deadline ? formatDateLong(application.deadline) : 'N/A'}
                   </span>
                 </div>
               </div>

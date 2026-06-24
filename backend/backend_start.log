@@ -1,0 +1,6 @@
+nohup: ignoring input
+CORS config: { CORS_ORIGIN: 'http://localhost:3000', NODE_ENV: 'development' }
+Server running in development mode on port 5000
+PostgreSQL database pool connected successfully
+PostgreSQL database pool connected successfully
+PostgreSQL database pool connected successfully

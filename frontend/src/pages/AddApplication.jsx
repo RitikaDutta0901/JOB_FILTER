@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { applicationService } from '../services/api';
 import { Briefcase, ArrowLeft, Save, Building2, MapPin, DollarSign, Calendar, Globe, FileText } from 'lucide-react';
 
 const AddApplication = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -56,6 +58,13 @@ const AddApplication = () => {
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   return (
     <div className="space-y-6 animate-fade-in">

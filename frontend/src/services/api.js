@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { dispatchLogoutEvent } from '../utils/authEvents';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -28,13 +29,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Clear token and reload if unauthorized (optional, handles session expiry)
-      const token = localStorage.getItem('token');
-      if (token) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
+      // Dispatch an app-level logout event so React can navigate cleanly
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // Dispatch logout event for React app to handle navigation
+      dispatchLogoutEvent();
     }
     return Promise.reject(error);
   }

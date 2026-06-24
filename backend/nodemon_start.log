@@ -1,0 +1,16 @@
+
+> job-tracker-backend@1.0.0 predev
+> sh -c "fuser -k 5000/tcp 2>/dev/null || true"
+
+
+> job-tracker-backend@1.0.0 dev
+> nodemon index.js
+
+[33m[nodemon] 3.1.14[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node index.js`[39m
+CORS config: { CORS_ORIGIN: 'http://localhost:3000', NODE_ENV: 'development' }
+Server running in development mode on port 5000
+[32m[nodemon] restarting child process[39m

@@ -278,8 +278,8 @@ const updateApplication = async (req, res, next) => {
         location = $6,
         work_mode = $7,
         status = $8,
-        applied_date = $9,
-        deadline = $10,
+        applied_date = CASE WHEN $9::text IS NULL OR $9::text = '' THEN applied_date ELSE $9::text::timestamp END,
+        deadline = CASE WHEN $10::text IS NULL OR $10::text = '' THEN deadline ELSE $10::text::timestamp END,
         resume_url = $11
       WHERE id = $12 AND user_id = $13
       RETURNING *

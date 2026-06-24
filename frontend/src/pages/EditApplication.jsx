@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { applicationService } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -7,6 +8,7 @@ import { Briefcase, ArrowLeft, Save, Building2, MapPin, DollarSign, Calendar, Gl
 const EditApplication = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -26,6 +28,12 @@ const EditApplication = () => {
 
   // Fetch application data
   useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
     const fetchApp = async () => {
       try {
         const response = await applicationService.getById(id);
