@@ -10,20 +10,56 @@ jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: job_tracker_db_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+      - name: Wait for PostgreSQL
+        run: |
+          npm install -g wait-on
+          wait-on tcp:localhost:5432 --timeout 30000
+      - name: Initialize test database
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGPORT: 5432
+        run: |
+          psql -h localhost -U postgres -d postgres -c "CREATE DATABASE job_tracker_db_test;" 2>/dev/null || true
+          psql -h localhost -U postgres -d job_tracker_db_test < database/schema.sql || true
+          psql -h localhost -U postgres -d job_tracker_db_test < database/seed.sql || true
       - name: Install backend dependencies
         working-directory: backend
         run: |
           npm ci
       - name: Run backend tests
         working-directory: backend
+        env:
+          NODE_ENV: test
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGPORT: 5432
+          PGDATABASE: job_tracker_db_test
+          JWT_SECRET: test_jwt_secret_key
         run: |
-          npm test -- --coverage
+          npm test -- --coverage --runInBand
 
   frontend-build:
     name: Frontend Build
