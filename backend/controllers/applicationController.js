@@ -351,10 +351,78 @@ const deleteApplication = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get aggregated application stats (Analytics)
+ * @route   GET /api/applications/stats
+ * @access  Private
+ */
+const getApplicationStats = async (req, res, next) => {
+  const userId = req.user.id;
+
+  try {
+    // 1. Total Applications Count
+    const totalQuery = 'SELECT COUNT(*) as count FROM applications WHERE user_id = $1';
+    const totalRes = await db.query(totalQuery, [userId]);
+    const totalApplications = parseInt(totalRes.rows[0].count, 10);
+
+    // 2. Status Distribution Count
+    const statusQuery = 'SELECT status, COUNT(*) as count FROM applications WHERE user_id = $1 GROUP BY status';
+    const statusRes = await db.query(statusQuery, [userId]);
+    const statusDistribution = statusRes.rows.map(r => ({
+      status: r.status,
+      count: parseInt(r.count, 10),
+    }));
+
+    // 3. Applications Over Time (grouped by applied_date)
+    const timelineQuery = `
+      SELECT applied_date::text as date, COUNT(*) as count 
+      FROM applications 
+      WHERE user_id = $1 
+      GROUP BY applied_date 
+      ORDER BY applied_date ASC
+    `;
+    const timelineRes = await db.query(timelineQuery, [userId]);
+    const timelineData = timelineRes.rows.map(r => ({
+      date: r.date,
+      count: parseInt(r.count, 10),
+    }));
+
+    // 4. Company Analytics (Application volumes and average salaries)
+    const companyStatsQuery = `
+      SELECT c.name as company_name, COUNT(*) as count, COALESCE(AVG(a.salary), 0)::numeric(12,2) as avg_salary
+      FROM applications a
+      JOIN companies c ON a.company_id = c.id
+      WHERE a.user_id = $1
+      GROUP BY c.name
+      ORDER BY count DESC, avg_salary DESC
+      LIMIT 5
+    `;
+    const companyRes = await db.query(companyStatsQuery, [userId]);
+    const companyData = companyRes.rows.map(r => ({
+      companyName: r.company_name,
+      count: parseInt(r.count, 10),
+      avgSalary: parseFloat(r.avg_salary),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      stats: {
+        totalApplications,
+        statusDistribution,
+        timelineData,
+        companyData,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getApplications,
   getApplicationById,
   createApplication,
   updateApplication,
   deleteApplication,
+  getApplicationStats,
 };

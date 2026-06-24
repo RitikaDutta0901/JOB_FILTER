@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 require('dotenv').config();
 
 const db = require('./db');
@@ -7,14 +8,20 @@ const authRoutes = require('./routes/authRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const roundRoutes = require('./routes/roundRoutes');
 const companyRoutes = require('./routes/companyRoutes');
+const noteRoutes = require('./routes/noteRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Enable CORS
+// Security headers
+app.use(helmet());
+
+// CORS configuration (allow override via CORS_ORIGIN env var)
+const corsOrigin = process.env.CORS_ORIGIN || '*';
 app.use(cors({
-  origin: '*', // For development. Can be restricted to specific domains in production
+  origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -40,6 +47,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api', roundRoutes); // handles /api/applications/:id/rounds and /api/rounds/:id
+app.use('/api', noteRoutes);  // handles /api/applications/:id/notes and /api/notes/:id
 app.use('/api/companies', companyRoutes);
 
 // Catch 404 routes

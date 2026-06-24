@@ -4,9 +4,10 @@
 TRUNCATE notes, rounds, applications, companies, users RESTART IDENTITY CASCADE;
 
 -- 1. Seed Users (password for both is 'password123' using standard bcrypt format)
+-- NOTE: Updated to a bcrypt hash that matches 'password123'
 INSERT INTO users (username, email, password_hash) VALUES
-('ritika_admin', 'admin@example.com', '$2b$10$wN194sCpl/gU6pP4Yd2/1.Yv95K.41iVez6wU4zO8/C33aC51Y31S'),
-('john_doe', 'john@example.com', '$2b$10$wN194sCpl/gU6pP4Yd2/1.Yv95K.41iVez6wU4zO8/C33aC51Y31S');
+('ritika_admin', 'admin@example.com', '$2a$10$9WXXqGmdAltU6Ra0Jic8MuAccTeKs1y3HGIRQt5fZO5EssKJmRCAm'),
+('john_doe', 'john@example.com', '$2a$10$9WXXqGmdAltU6Ra0Jic8MuAccTeKs1y3HGIRQt5fZO5EssKJmRCAm');
 
 -- 2. Seed Companies
 INSERT INTO companies (name, website, industry, logo_url) VALUES
