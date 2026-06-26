@@ -1,5 +1,5 @@
 const db = require('../db');
-const { createRoadmapForApplication, ensureRoadmapsForUser } = require('./roadmapController');
+const { createRoadmapForApplication, ensureRoadmapsForUser, deleteRoadmapForApplication } = require('./roadmapController');
 
 /**
  * @desc    Get all user applications (with Search, Filter, Sort)
@@ -223,7 +223,7 @@ const updateApplication = async (req, res, next) => {
 
   try {
     // 1. Verify existence & ownership
-    const checkQuery = 'SELECT id, company_id FROM applications WHERE id = $1 AND user_id = $2';
+    const checkQuery = 'SELECT id, company_id, status FROM applications WHERE id = $1 AND user_id = $2';
     const checkResult = await db.query(checkQuery, [id, userId]);
 
     if (checkResult.rows.length === 0) {
@@ -294,6 +294,17 @@ const updateApplication = async (req, res, next) => {
 
     const result = await db.query(updateQuery, updateParams);
     const updatedApp = result.rows[0];
+
+    // Regenerate roadmap if status changed
+    if (status && status !== currentApp.status) {
+      const roadmapApp = await db.query(
+        `SELECT a.id, a.job_title, a.job_description, a.status, c.name AS company_name
+         FROM applications a JOIN companies c ON a.company_id = c.id WHERE a.id = $1`,
+        [updatedApp.id]
+      );
+      await deleteRoadmapForApplication(updatedApp.id);
+      await createRoadmapForApplication(roadmapApp.rows[0]);
+    }
 
     // Fetch joined details
     const finalResult = await db.query(

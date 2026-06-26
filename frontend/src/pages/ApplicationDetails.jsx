@@ -9,7 +9,7 @@ import RoundTimeline from '../components/RoundTimeline';
 import InterviewRoadmap from '../components/InterviewRoadmap';
 import {
   ArrowLeft, Edit3, Trash2, Pencil, Calendar, MapPin, DollarSign, Globe, FileText,
-  Plus, X, AlertCircle, Building2, Check
+  Plus, X, AlertCircle, Building2, Check, RefreshCw
 } from 'lucide-react';
 import { formatDateLong } from '../utils/date';
 
@@ -29,6 +29,7 @@ const ApplicationDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingTopicId, setUpdatingTopicId] = useState(null);
+  const [regeneratingRoadmap, setRegeneratingRoadmap] = useState(false);
   
   // Add Note state
   const [noteContent, setNoteContent] = useState('');
@@ -59,17 +60,22 @@ const ApplicationDetails = () => {
     setError('');
     try {
       // Fetch Application details, rounds, notes, and roadmap in parallel
-      const [appRes, roundsRes, notesRes, roadmapRes] = await Promise.all([
+      const [appRes, roundsRes, notesRes] = await Promise.all([
         applicationService.getById(id),
         roundService.getByApplication(id),
         noteService.getByApplication(id),
-        roadmapService.getByApplication(id)
       ]);
 
       setApplication(appRes.data.application);
       setRounds(roundsRes.data.rounds);
       setNotes(notesRes.data.notes);
-      setRoadmap(roadmapRes.data.roadmap);
+
+      try {
+        const roadmapRes = await roadmapService.getByApplication(id);
+        setRoadmap(roadmapRes.data.roadmap);
+      } catch {
+        setRoadmap(null);
+      }
     } catch (err) {
       console.error(err);
       setError('Failed to fetch details. The tracking ID might be invalid.');
@@ -232,6 +238,20 @@ const ApplicationDetails = () => {
       toast.error('Failed to update roadmap topic.');
     } finally {
       setUpdatingTopicId(null);
+    }
+  };
+
+  const handleRegenerateRoadmap = async () => {
+    setRegeneratingRoadmap(true);
+    try {
+      const response = await roadmapService.regenerate(id);
+      setRoadmap(response.data.roadmap);
+      toast.success('Roadmap regenerated based on current application stage.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to regenerate roadmap.');
+    } finally {
+      setRegeneratingRoadmap(false);
     }
   };
 
@@ -486,11 +506,24 @@ const ApplicationDetails = () => {
             </div>
           </div>
 
-          <InterviewRoadmap
-            roadmap={roadmap}
-            onToggleTopic={handleToggleRoadmapTopic}
-            updatingTopicId={updatingTopicId}
-          />
+          <div className="relative">
+            <div className="flex items-center justify-end mb-2">
+              <button
+                onClick={handleRegenerateRoadmap}
+                disabled={regeneratingRoadmap}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white bg-brand-border/30 hover:bg-brand-border/50 border border-brand-border/40 transition-all disabled:opacity-50"
+                aria-label="Regenerate roadmap based on current stage"
+              >
+                <RefreshCw size={12} className={regeneratingRoadmap ? 'animate-spin' : ''} aria-hidden="true" />
+                {regeneratingRoadmap ? 'Regenerating...' : 'Regenerate'}
+              </button>
+            </div>
+            <InterviewRoadmap
+              roadmap={roadmap}
+              onToggleTopic={handleToggleRoadmapTopic}
+              updatingTopicId={updatingTopicId}
+            />
+          </div>
         </div>
 
         {/* Right Column: Interview Timeline Stepper */}

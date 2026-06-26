@@ -82,6 +82,7 @@ export const noteService = {
 export const roadmapService = {
   getByApplication: (appId) => api.get(`/applications/${appId}/roadmap`),
   updateTopic: (topicId, isCompleted) => api.put(`/roadmap-topics/${topicId}`, { isCompleted }),
+  regenerate: (appId) => api.post(`/applications/${appId}/roadmap/regenerate`),
 };
 
 export default api;

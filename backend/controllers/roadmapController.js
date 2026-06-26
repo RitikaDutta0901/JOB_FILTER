@@ -36,11 +36,20 @@ const mapRoadmapRows = (rows) => {
   };
 };
 
+const deleteRoadmapForApplication = async (applicationId, client = db) => {
+  await client.query(
+    'DELETE FROM interview_roadmap_topics WHERE application_id = $1',
+    [applicationId]
+  );
+};
+
 const createRoadmapForApplication = async (application, client = db) => {
   const topics = generateRoadmapTopics({
     applicationId: application.id,
     jobTitle: application.job_title,
-    jobDescription: application.job_description,
+    jobDescription: application.job_description || '',
+    companyName: application.company_name || '',
+    status: application.status || 'Applied',
   });
 
   if (topics.length === 0) return;
@@ -61,6 +70,40 @@ const createRoadmapForApplication = async (application, client = db) => {
   );
 };
 
+const regenerateRoadmapForApplication = async (req, res, next) => {
+  const userId = req.user.id;
+  const applicationId = req.params.id;
+
+  try {
+    const appResult = await db.query(
+      `SELECT a.id, a.job_title, a.job_description, a.status, c.name AS company_name
+       FROM applications a
+       JOIN companies c ON a.company_id = c.id
+       WHERE a.id = $1 AND a.user_id = $2`,
+      [applicationId, userId]
+    );
+
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found or unauthorized',
+      });
+    }
+
+    await deleteRoadmapForApplication(applicationId);
+    await createRoadmapForApplication(appResult.rows[0]);
+
+    const rows = await getRoadmapRows(applicationId);
+
+    return res.status(200).json({
+      success: true,
+      roadmap: mapRoadmapRows(rows),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getRoadmapRows = async (applicationId) => {
   const result = await db.query(
     `SELECT *
@@ -75,11 +118,12 @@ const getRoadmapRows = async (applicationId) => {
 
 const ensureRoadmapsForUser = async (userId) => {
   const result = await db.query(
-    `SELECT a.id, a.job_title, a.job_description
+    `SELECT a.id, a.job_title, a.job_description, a.status, c.name AS company_name
      FROM applications a
+     JOIN companies c ON a.company_id = c.id
      LEFT JOIN interview_roadmap_topics rt ON rt.application_id = a.id
      WHERE a.user_id = $1
-     GROUP BY a.id, a.job_title, a.job_description
+     GROUP BY a.id, a.job_title, a.job_description, a.status, c.name
      HAVING COUNT(rt.id) = 0`,
     [userId]
   );
@@ -95,9 +139,10 @@ const getRoadmapForApplication = async (req, res, next) => {
 
   try {
     const appResult = await db.query(
-      `SELECT id, job_title, job_description
-       FROM applications
-       WHERE id = $1 AND user_id = $2`,
+      `SELECT a.id, a.job_title, a.job_description, a.status, c.name AS company_name
+       FROM applications a
+       JOIN companies c ON a.company_id = c.id
+       WHERE a.id = $1 AND a.user_id = $2`,
       [applicationId, userId]
     );
 
@@ -178,4 +223,6 @@ module.exports = {
   ensureRoadmapsForUser,
   getRoadmapForApplication,
   updateRoadmapTopic,
+  regenerateRoadmapForApplication,
+  deleteRoadmapForApplication,
 };
