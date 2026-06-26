@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { authService } from '../services/api';
 import { onLogoutEvent } from '../utils/authEvents';
 import { useNavigate } from 'react-router-dom';
@@ -23,28 +23,19 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Listen for global logout events (e.g., token expiry from API interceptor)
+  const navigate = useNavigate();
   useEffect(() => {
-    const navigate = (path) => {
-      // placeholder
-    };
     const handler = () => {
-      // perform local logout and navigate to login
       setToken(null);
       setUser(null);
-      try {
-        // dynamic navigate via window history fallback; AuthProvider is not a router component
-        // we rely on consumer components to read isAuthenticated and redirect, but we can still push state
-        window.history.pushState({}, '', '/login');
-      } catch (e) {
-        // no-op
-      }
+      navigate('/login', { replace: true });
     };
 
     const unsubscribe = onLogoutEvent(handler);
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, []);
+  }, [navigate]);
 
   const login = async (email, password) => {
     try {

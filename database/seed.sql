@@ -1,7 +1,7 @@
 -- Seed Data for Job/Internship Application Tracker
 
 -- Clear existing data (in correct dependency order)
-TRUNCATE notes, rounds, applications, companies, users RESTART IDENTITY CASCADE;
+TRUNCATE interview_roadmap_topics, notes, rounds, applications, companies, users RESTART IDENTITY CASCADE;
 
 -- 1. Seed Users (password for both is 'password123' using standard bcrypt format)
 -- NOTE: Updated to a bcrypt hash that matches 'password123'

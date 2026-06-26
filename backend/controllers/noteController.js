@@ -83,6 +83,52 @@ const createNote = async (req, res, next) => {
 };
 
 /**
+ * @desc    Update a specific note
+ * @route   PUT /api/notes/:id
+ * @access  Private
+ */
+const updateNote = async (req, res, next) => {
+  const userId = req.user.id;
+  const noteId = req.params.id;
+  const { content } = req.body;
+
+  if (!content || content.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      message: 'Note content is required',
+    });
+  }
+
+  try {
+    const checkQuery = `
+      SELECT n.id
+      FROM notes n
+      JOIN applications a ON n.application_id = a.id
+      WHERE n.id = $1 AND a.user_id = $2
+    `;
+    const checkResult = await db.query(checkQuery, [noteId, userId]);
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Note not found or unauthorized',
+      });
+    }
+
+    const updateQuery = 'UPDATE notes SET content = $1 WHERE id = $2 RETURNING *';
+    const result = await db.query(updateQuery, [content.trim(), noteId]);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Note updated successfully',
+      note: result.rows[0],
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Delete a specific note
  * @route   DELETE /api/notes/:id
  * @access  Private
@@ -124,5 +170,6 @@ const deleteNote = async (req, res, next) => {
 module.exports = {
   getNotesForApplication,
   createNote,
+  updateNote,
   deleteNote,
 };

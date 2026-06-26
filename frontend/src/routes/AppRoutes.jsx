@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
@@ -13,6 +13,9 @@ import AddApplication from '../pages/AddApplication';
 import EditApplication from '../pages/EditApplication';
 import ApplicationDetails from '../pages/ApplicationDetails';
 import Analytics from '../pages/Analytics';
+import Profile from '../pages/Profile';
+import ForgotPassword from '../pages/ForgotPassword';
+import ResetPassword from '../pages/ResetPassword';
 
 // Private Route Guard
 const PrivateRoute = ({ children }) => {
@@ -54,6 +57,8 @@ const AppRoutes = () => {
       {/* Public Auth Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected Tracking Routes */}
       <Route
@@ -102,6 +107,16 @@ const AppRoutes = () => {
           <PrivateRoute>
             <AppLayout>
               <Analytics />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <PrivateRoute>
+            <AppLayout>
+              <Profile />
             </AppLayout>
           </PrivateRoute>
         }

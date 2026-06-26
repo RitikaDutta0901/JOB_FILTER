@@ -1,5 +1,3 @@
-import React from 'react';
-
 const StatusBadge = ({ status }) => {
   // Return HSL-specific style parameters for each application pipeline phase
   const statusStyles = {

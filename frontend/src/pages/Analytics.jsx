@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { applicationService } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../context/AuthContext';
 import {
-  ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
+  ResponsiveContainer, BarChart, Bar, AreaChart, Area,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
-import { BarChart3, AlertCircle, TrendingUp, Award, Activity, Percent } from 'lucide-react';
+import { BarChart3, AlertCircle, TrendingUp, Award, Activity, Percent, Target } from 'lucide-react';
 
 const Analytics = () => {
   const [stats, setStats] = useState(null);
@@ -69,6 +69,19 @@ const Analytics = () => {
   };
 
   const funnelData = getFunnelData();
+  const roadmapProgress = stats.roadmapProgress || {
+    totalTopics: 0,
+    completedTopics: 0,
+    completionPercentage: 0,
+    weeklyProgress: [],
+    applicationReadiness: [],
+  };
+  const roadmapWeeklyData = roadmapProgress.weeklyProgress.map((week) => ({
+    week: `Week ${week.weekNumber}`,
+    completed: week.completedTopics,
+    remaining: Math.max(week.totalTopics - week.completedTopics, 0),
+    completion: week.completionPercentage,
+  }));
 
   // Status Distribution Data & Color mapping
   const statusColors = {
@@ -100,7 +113,7 @@ const Analytics = () => {
       </div>
 
       {/* Analytics KPI banner */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="glass-panel rounded-3xl p-6 border border-brand-border/60 flex items-center gap-4">
           <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
             <Activity size={24} />
@@ -128,6 +141,16 @@ const Analytics = () => {
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Conversion Rate</p>
             <h3 className="text-3xl font-black text-white mt-1">{conversionRate}%</h3>
+          </div>
+        </div>
+
+        <div className="glass-panel rounded-3xl p-6 border border-brand-border/60 flex items-center gap-4">
+          <div className="h-12 w-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
+            <Target size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Readiness</p>
+            <h3 className="text-3xl font-black text-white mt-1">{roadmapProgress.completionPercentage}%</h3>
           </div>
         </div>
       </div>
@@ -280,6 +303,71 @@ const Analytics = () => {
                   <Bar yAxisId="right" dataKey="avgSalary" name="Avg Salary" fill="#A855F7" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Roadmap weekly progress */}
+        <div className="glass-panel rounded-3xl p-6 border border-brand-border/60 space-y-4">
+          <div>
+            <h3 className="text-lg font-bold text-white leading-tight">Roadmap Weekly Progress</h3>
+            <p className="text-xs text-gray-400 mt-1">Completed preparation topics grouped by roadmap week</p>
+          </div>
+          <div className="h-80 w-full pr-4 text-xs">
+            {roadmapWeeklyData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-sm text-gray-500">No roadmap progress recorded.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={roadmapWeeklyData}
+                  margin={{ top: 20, right: 10, left: -10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#232E4A" vertical={false} />
+                  <XAxis dataKey="week" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#151D30', borderColor: '#232E4A' }}
+                    labelStyle={{ color: '#fff', fontWeight: 'bold' }}
+                  />
+                  <Legend verticalAlign="top" height={36}/>
+                  <Bar dataKey="completed" name="Completed" stackId="roadmap" fill="#14B8A6" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="remaining" name="Remaining" stackId="roadmap" fill="#232E4A" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Application readiness list */}
+        <div className="glass-panel rounded-3xl p-6 border border-brand-border/60 space-y-4">
+          <div>
+            <h3 className="text-lg font-bold text-white leading-tight">Application Readiness</h3>
+            <p className="text-xs text-gray-400 mt-1">Recent applications ranked by roadmap completion state</p>
+          </div>
+          <div className="space-y-3">
+            {roadmapProgress.applicationReadiness.length === 0 ? (
+              <div className="h-72 flex items-center justify-center text-sm text-gray-500">No readiness data available.</div>
+            ) : (
+              roadmapProgress.applicationReadiness.map((item) => (
+                <div key={item.id} className="bg-brand-dark/30 border border-brand-border/40 rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-white truncate">{item.jobTitle}</h4>
+                      <p className="text-xs text-gray-400 mt-0.5">{item.companyName}</p>
+                    </div>
+                    <span className="text-sm font-black text-brand-secondary shrink-0">{item.completionPercentage}%</span>
+                  </div>
+                  <div className="h-2 bg-brand-border/70 rounded-full overflow-hidden mt-3">
+                    <div
+                      className="h-full bg-brand-secondary"
+                      style={{ width: `${item.completionPercentage}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-2">
+                    {item.completedTopics}/{item.totalTopics} topics complete
+                  </p>
+                </div>
+              ))
             )}
           </div>
         </div>

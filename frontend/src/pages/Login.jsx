@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, LogIn, AlertCircle, Briefcase } from 'lucide-react';
@@ -96,6 +96,9 @@ const Login = () => {
                 <label htmlFor="password" className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   Password
                 </label>
+                <Link to="/forgot-password" className="text-[10px] text-brand-secondary hover:text-brand-primary transition-colors">
+                  Forgot?
+                </Link>
               </div>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">

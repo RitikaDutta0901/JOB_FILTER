@@ -8,7 +8,11 @@ const authRoutes = require('./routes/authRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const roundRoutes = require('./routes/roundRoutes');
 const companyRoutes = require('./routes/companyRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 const noteRoutes = require('./routes/noteRoutes');
+const roadmapRoutes = require('./routes/roadmapRoutes');
+const passwordResetRoutes = require('./routes/passwordResetRoutes');
+const exportRoutes = require('./routes/exportRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
 
 const app = express();
@@ -18,25 +22,20 @@ const PORT = process.env.PORT || 5000;
 // Security headers
 app.use(helmet());
 
-// CORS configuration (allow override via CORS_ORIGIN env var)
-const corsEnv = process.env.CORS_ORIGIN || '*';
-console.log('CORS config:', { CORS_ORIGIN: corsEnv, NODE_ENV: process.env.NODE_ENV || 'development' });
-
 let corsOptions;
 if (process.env.NODE_ENV === 'production') {
+  const corsOrigin = process.env.CORS_ORIGIN;
+  if (!corsOrigin) {
+    console.warn('WARNING: CORS_ORIGIN not set. Allowing same-origin only.');
+  }
   corsOptions = {
-    origin: corsEnv,
+    origin: corsOrigin || false,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   };
 } else {
-  // In development allow the request origin (handles localhost/127.0.0.1:5173 Vite host)
   corsOptions = {
-    origin: (origin, callback) => {
-      // Allow requests with no origin (curl, server-to-server) and typical dev origins
-      if (!origin) return callback(null, true);
-      return callback(null, true);
-    },
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   };
@@ -65,7 +64,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api', roundRoutes); // handles /api/applications/:id/rounds and /api/rounds/:id
 app.use('/api', noteRoutes);  // handles /api/applications/:id/notes and /api/notes/:id
+app.use('/api', roadmapRoutes); // handles /api/applications/:id/roadmap and /api/roadmap-topics/:id
 app.use('/api/companies', companyRoutes);
+app.use('/api/users', profileRoutes);
+app.use('/api/auth', passwordResetRoutes);
+app.use('/api', exportRoutes);
 
 // Catch 404 routes
 app.use((req, res, next) => {

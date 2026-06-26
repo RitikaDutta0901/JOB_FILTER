@@ -1,9 +1,8 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Calendar, DollarSign, Building2, ChevronRight, Edit3 } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 
-const ApplicationCard = ({ application, onDelete }) => {
+const ApplicationCard = ({ application }) => {
   const {
     id,
     job_title,
@@ -45,18 +44,21 @@ const ApplicationCard = ({ application, onDelete }) => {
             {company_logo ? (
               <img
                 src={company_logo}
-                alt={company_name}
+                alt={`${company_name} logo`}
                 className="w-11 h-11 rounded-xl bg-white/5 object-contain p-1 border border-brand-border/50"
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
+                  const fallback = e.target.parentElement.querySelector('[data-logo-fallback]');
+                  if (fallback) fallback.style.display = 'flex';
                 }}
               />
             ) : null}
             <div
+              data-logo-fallback
               className="w-11 h-11 rounded-xl bg-brand-border/40 text-brand-primary border border-brand-border flex items-center justify-center font-bold text-lg"
-              style={{ display: company_logo ? 'none' : 'flex' }}
+              style={{ display: !company_logo ? 'flex' : 'none' }}
+              aria-hidden="true"
             >
               <Building2 size={20} />
             </div>
@@ -72,21 +74,21 @@ const ApplicationCard = ({ application, onDelete }) => {
 
         {/* Job Title */}
         <h3 className="font-bold text-white text-lg tracking-tight mb-3 hover:text-brand-primary transition-colors truncate">
-          <Link to={`/applications/${id}`}>{job_title}</Link>
+          <Link to={`/applications/${id}`} aria-label={`View details for ${job_title} at ${company_name}`}>{job_title}</Link>
         </h3>
 
         {/* Metadata Details */}
         <div className="space-y-2 mb-5">
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <MapPin size={14} className="text-gray-500" />
+            <MapPin size={14} className="text-gray-500 shrink-0" aria-hidden="true" />
             <span className="truncate">{location || 'Remote'}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <Calendar size={14} className="text-gray-500" />
+            <Calendar size={14} className="text-gray-500 shrink-0" aria-hidden="true" />
             <span>Applied: {formatDate(applied_date)}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <DollarSign size={14} className="text-gray-500" />
+            <DollarSign size={14} className="text-gray-500 shrink-0" aria-hidden="true" />
             <span>Salary: {formatSalary(salary)}</span>
           </div>
         </div>
@@ -97,16 +99,17 @@ const ApplicationCard = ({ application, onDelete }) => {
         <Link
           to={`/edit/${id}`}
           className="p-2 rounded-xl text-gray-400 hover:text-brand-primary hover:bg-brand-border/50 border border-transparent hover:border-brand-border transition-all duration-200"
-          title="Edit Application"
+          aria-label={`Edit ${job_title} application`}
         >
-          <Edit3 size={15} />
+          <Edit3 size={15} aria-hidden="true" />
         </Link>
         <Link
           to={`/applications/${id}`}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-brand-primary hover:text-white bg-brand-primary/10 hover:bg-brand-primary border border-brand-primary/20 hover:border-transparent transition-all duration-200"
+          aria-label={`View details for ${job_title}`}
         >
           Details
-          <ChevronRight size={14} />
+          <ChevronRight size={14} aria-hidden="true" />
         </Link>
       </div>
     </div>

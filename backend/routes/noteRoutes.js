@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getNotesForApplication,
   createNote,
+  updateNote,
   deleteNote,
 } = require('../controllers/noteController');
 const { protect } = require('../middleware/authMiddleware');
@@ -14,7 +15,8 @@ router.use(protect);
 router.get('/applications/:id/notes', getNotesForApplication);
 router.post('/applications/:id/notes', createNote);
 
-// Direct note route
+// Direct note routes
+router.put('/notes/:id', updateNote);
 router.delete('/notes/:id', deleteNote);
 
 module.exports = router;

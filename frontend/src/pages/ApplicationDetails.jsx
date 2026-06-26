@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { applicationService, roundService } from '../services/api';
-import api from '../services/api'; // for direct notes custom endpoint mapping
+import { applicationService, roundService, noteService, roadmapService } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import StatusBadge from '../components/StatusBadge';
 import RoundTimeline from '../components/RoundTimeline';
+import InterviewRoadmap from '../components/InterviewRoadmap';
 import {
-  ArrowLeft, Edit3, Trash2, Calendar, MapPin, DollarSign, Globe, FileText,
-  Plus, X, Check, Clock, AlertCircle, Building2
+  ArrowLeft, Edit3, Trash2, Pencil, Calendar, MapPin, DollarSign, Globe, FileText,
+  Plus, X, AlertCircle, Building2, Check
 } from 'lucide-react';
 import { formatDateLong } from '../utils/date';
 
@@ -16,15 +17,18 @@ const ApplicationDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
+  const toast = useToast();
   
   // Data State
   const [application, setApplication] = useState(null);
   const [rounds, setRounds] = useState([]);
   const [notes, setNotes] = useState([]);
+  const [roadmap, setRoadmap] = useState(null);
   
   // UI State
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [updatingTopicId, setUpdatingTopicId] = useState(null);
   
   // Add Note state
   const [noteContent, setNoteContent] = useState('');
@@ -54,16 +58,18 @@ const ApplicationDetails = () => {
     setLoading(true);
     setError('');
     try {
-      // Fetch Application details, rounds, and notes in parallel
-      const [appRes, roundsRes, notesRes] = await Promise.all([
+      // Fetch Application details, rounds, notes, and roadmap in parallel
+      const [appRes, roundsRes, notesRes, roadmapRes] = await Promise.all([
         applicationService.getById(id),
         roundService.getByApplication(id),
-        api.get(`/applications/${id}/notes`)
+        noteService.getByApplication(id),
+        roadmapService.getByApplication(id)
       ]);
 
       setApplication(appRes.data.application);
       setRounds(roundsRes.data.rounds);
       setNotes(notesRes.data.notes);
+      setRoadmap(roadmapRes.data.roadmap);
     } catch (err) {
       console.error(err);
       setError('Failed to fetch details. The tracking ID might be invalid.');
@@ -79,7 +85,7 @@ const ApplicationDetails = () => {
         navigate('/');
       } catch (err) {
         console.error(err);
-        alert('Failed to delete application.');
+        toast.error('Failed to delete application.');
       }
     }
   };
@@ -91,12 +97,12 @@ const ApplicationDetails = () => {
 
     setNoteSubmitting(true);
     try {
-      const response = await api.post(`/applications/${id}/notes`, { content: noteContent.trim() });
+      const response = await noteService.create(id, noteContent.trim());
       setNotes([response.data.note, ...notes]);
       setNoteContent('');
     } catch (err) {
       console.error(err);
-      alert('Failed to save note.');
+      toast.error('Failed to save note.');
     } finally {
       setNoteSubmitting(false);
     }
@@ -105,12 +111,40 @@ const ApplicationDetails = () => {
   const handleDeleteNote = async (noteId) => {
     if (window.confirm('Delete this note?')) {
       try {
-        await api.delete(`/notes/${noteId}`);
+        await noteService.delete(noteId);
         setNotes(notes.filter(n => n.id !== noteId));
       } catch (err) {
         console.error(err);
-        alert('Failed to delete note.');
+        toast.error('Failed to delete note.');
       }
+    }
+  };
+
+  // Note Editing State
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editingNoteContent, setEditingNoteContent] = useState('');
+
+  const handleStartEditNote = (note) => {
+    setEditingNoteId(note.id);
+    setEditingNoteContent(note.content);
+  };
+
+  const handleCancelEditNote = () => {
+    setEditingNoteId(null);
+    setEditingNoteContent('');
+  };
+
+  const handleSaveEditNote = async (noteId) => {
+    if (!editingNoteContent.trim()) return;
+    try {
+      const response = await noteService.update(noteId, editingNoteContent.trim());
+      setNotes(notes.map(n => n.id === noteId ? response.data.note : n));
+      setEditingNoteId(null);
+      setEditingNoteContent('');
+      toast.success('Note updated.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update note.');
     }
   };
 
@@ -170,7 +204,7 @@ const ApplicationDetails = () => {
       setShowRoundModal(false);
     } catch (err) {
       console.error(err);
-      alert('Failed to save interview round.');
+      toast.error('Failed to save interview round.');
     } finally {
       setRoundSubmitting(false);
     }
@@ -183,8 +217,21 @@ const ApplicationDetails = () => {
         setRounds(rounds.filter(r => r.id !== roundId));
       } catch (err) {
         console.error(err);
-        alert('Failed to delete round.');
+        toast.error('Failed to delete round.');
       }
+    }
+  };
+
+  const handleToggleRoadmapTopic = async (topic) => {
+    setUpdatingTopicId(topic.id);
+    try {
+      const response = await roadmapService.updateTopic(topic.id, !topic.is_completed);
+      setRoadmap(response.data.roadmap);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update roadmap topic.');
+    } finally {
+      setUpdatingTopicId(null);
     }
   };
 
@@ -376,30 +423,74 @@ const ApplicationDetails = () => {
               ) : (
                 notes.map((note) => (
                   <div key={note.id} className="bg-brand-dark/30 border border-brand-border/50 rounded-2xl p-4 flex justify-between items-start gap-4">
-                    <div className="space-y-1">
-                      <p className="text-sm text-gray-200 whitespace-pre-line leading-relaxed">{note.content}</p>
-                      <span className="text-[10px] text-gray-500 block">
-                        {new Date(note.created_at).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
+                    {editingNoteId === note.id ? (
+                      <div className="flex-1 space-y-2">
+                        <textarea
+                          value={editingNoteContent}
+                          onChange={(e) => setEditingNoteContent(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-brand-dark border border-brand-border/60 text-gray-200 text-sm focus:border-brand-primary outline-none resize-none"
+                          rows={3}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSaveEditNote(note.id)}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 transition-colors flex items-center gap-1"
+                          >
+                            <Check size={12} /> Save
+                          </button>
+                          <button
+                            onClick={handleCancelEditNote}
+                            className="px-3 py-1.5 rounded-lg bg-brand-border/40 text-gray-400 text-xs font-semibold hover:bg-brand-border/60 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-200 whitespace-pre-line leading-relaxed">{note.content}</p>
+                          <span className="text-[10px] text-gray-500 block">
+                            {new Date(note.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleStartEditNote(note)}
+                      className="p-1 rounded text-gray-500 hover:text-brand-primary hover:bg-brand-border/40 transition-colors"
+                      title="Edit Note"
+                      aria-label="Edit note"
+                    >
+                      <Pencil size={13} />
+                    </button>
                     <button
                       onClick={() => handleDeleteNote(note.id)}
-                      className="p-1 rounded text-gray-500 hover:text-red-400 hover:bg-brand-border/40 transition-colors shrink-0"
+                      className="p-1 rounded text-gray-500 hover:text-red-400 hover:bg-brand-border/40 transition-colors"
                       title="Delete Note"
+                      aria-label="Delete note"
                     >
-                      <Trash2 size={13} />
-                    </button>
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))
               )}
             </div>
           </div>
+
+          <InterviewRoadmap
+            roadmap={roadmap}
+            onToggleTopic={handleToggleRoadmapTopic}
+            updatingTopicId={updatingTopicId}
+          />
         </div>
 
         {/* Right Column: Interview Timeline Stepper */}

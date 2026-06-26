@@ -26,6 +26,9 @@ lerna-debug.log*
 # Diagnostic reports
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+# Test coverage
+coverage/
+
 # OS files
 .DS_Store
 Thumbs.db

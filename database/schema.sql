@@ -4,6 +4,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Drop existing tables if they exist to start fresh during setup
+DROP TABLE IF EXISTS interview_roadmap_topics CASCADE;
 DROP TABLE IF EXISTS notes CASCADE;
 DROP TABLE IF EXISTS rounds CASCADE;
 DROP TABLE IF EXISTS applications CASCADE;
@@ -72,6 +73,36 @@ CREATE TABLE notes (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 6. Interview Roadmap Topics
+CREATE TABLE interview_roadmap_topics (
+    id SERIAL PRIMARY KEY,
+    application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    role_focus VARCHAR(50) NOT NULL,
+    week_number INTEGER NOT NULL CHECK (week_number BETWEEN 1 AND 8),
+    category VARCHAR(100) NOT NULL,
+    topic VARCHAR(150) NOT NULL,
+    description TEXT NOT NULL,
+    display_order INTEGER NOT NULL,
+    is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (application_id, display_order)
+);
+
+-- 7. Password Reset Tokens Table
+CREATE TABLE password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+CREATE INDEX idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
+
 -- Indexes for Query Optimization
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_applications_user_id ON applications(user_id);
@@ -79,6 +110,8 @@ CREATE INDEX idx_applications_company_id ON applications(company_id);
 CREATE INDEX idx_applications_status ON applications(status);
 CREATE INDEX idx_rounds_application_id ON rounds(application_id);
 CREATE INDEX idx_notes_application_id ON notes(application_id);
+CREATE INDEX idx_interview_roadmap_application_id ON interview_roadmap_topics(application_id);
+CREATE INDEX idx_interview_roadmap_week ON interview_roadmap_topics(application_id, week_number);
 
 -- Trigger Function to update updated_at automatically
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -113,4 +146,9 @@ CREATE TRIGGER update_rounds_updated_at
 CREATE TRIGGER update_notes_updated_at 
     BEFORE UPDATE ON notes 
     FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_interview_roadmap_topics_updated_at
+    BEFORE UPDATE ON interview_roadmap_topics
+    FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

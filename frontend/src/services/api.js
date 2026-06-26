@@ -47,6 +47,11 @@ export const authService = {
     api.post('/auth/login', { email, password }),
 };
 
+// Export API endpoints
+export const exportService = {
+  downloadCSV: (params) => api.get('/applications/csv', { params, responseType: 'blob' }),
+};
+
 // Applications API endpoints
 export const applicationService = {
   getAll: (params) => api.get('/applications', { params }),
@@ -65,9 +70,18 @@ export const roundService = {
   delete: (roundId) => api.delete(`/rounds/${roundId}`),
 };
 
-// Companies API endpoints
-export const companyService = {
-  getAll: () => api.get('/companies'),
+// Notes API endpoints
+export const noteService = {
+  getByApplication: (appId) => api.get(`/applications/${appId}/notes`),
+  create: (appId, content) => api.post(`/applications/${appId}/notes`, { content }),
+  update: (noteId, content) => api.put(`/notes/${noteId}`, { content }),
+  delete: (noteId) => api.delete(`/notes/${noteId}`),
+};
+
+// Interview Roadmap API endpoints
+export const roadmapService = {
+  getByApplication: (appId) => api.get(`/applications/${appId}/roadmap`),
+  updateTopic: (topicId, isCompleted) => api.put(`/roadmap-topics/${topicId}`, { isCompleted }),
 };
 
 export default api;

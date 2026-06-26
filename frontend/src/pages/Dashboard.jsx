@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { applicationService } from '../services/api';
+import { applicationService, exportService } from '../services/api';
 import ApplicationCard from '../components/ApplicationCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../context/AuthContext';
-import { Search, Filter, ArrowUpDown, Briefcase, Plus, RefreshCw, XCircle } from 'lucide-react';
+import { Search, Briefcase, RefreshCw, XCircle, Target, Plus, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 
 const Dashboard = () => {
   const [applications, setApplications] = useState([]);
+  const [roadmapStats, setRoadmapStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -17,60 +18,61 @@ const Dashboard = () => {
   const [workMode, setWorkMode] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const { isAuthenticated, loading: authLoading } = useAuth();
 
-  // Debounced Search or Manual Fetch triggers
   useEffect(() => {
-    // Wait until auth initialization completes
     if (authLoading) return;
-    // If not authenticated, do not attempt to fetch applications
     if (!isAuthenticated) {
       setLoading(false);
       setApplications([]);
       return;
     }
-
-    fetchApplications();
+    setPage(1);
   }, [status, workMode, sortBy, sortOrder, isAuthenticated, authLoading]);
 
-  // Debounce search input to avoid excessive API calls
   const searchDebounceRef = useRef(null);
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
-    // Clear previous timer
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    // If search empty, fetch immediately (to reset filters)
     if (!search.trim()) {
       fetchApplications();
       return;
     }
-    // Only debounce when user types; require min 2 chars to avoid noisy queries
     if (search.trim().length < 2) return;
-
     searchDebounceRef.current = setTimeout(() => {
       fetchApplications();
     }, 600);
-
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
   }, [search]);
 
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
+    fetchApplications();
+  }, [page, isAuthenticated, authLoading]);
+
   const fetchApplications = async () => {
     setLoading(true);
     setError('');
     try {
-      const params = {
-        sortBy,
-        sortOrder,
-      };
+      const params = { sortBy, sortOrder, page };
       if (search.trim()) params.search = search.trim();
       if (status) params.status = status;
       if (workMode) params.workMode = workMode;
 
-      const response = await applicationService.getAll(params);
-      setApplications(response.data.applications);
+      const [applicationsRes, statsRes] = await Promise.all([
+        applicationService.getAll(params),
+        applicationService.getStats(),
+      ]);
+      setApplications(applicationsRes.data.applications);
+      setTotalPages(applicationsRes.data.totalPages || 1);
+      setTotalCount(applicationsRes.data.totalCount || 0);
+      setRoadmapStats(statsRes.data.stats.roadmapProgress);
     } catch (err) {
       console.error(err);
       setError('Failed to fetch applications. Please check server.');
@@ -81,7 +83,7 @@ const Dashboard = () => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    fetchApplications();
+    setPage(1);
   };
 
   const handleResetFilters = () => {
@@ -90,16 +92,40 @@ const Dashboard = () => {
     setWorkMode('');
     setSortBy('created_at');
     setSortOrder('desc');
-    // Fetch will trigger due to status/workMode useEffect dependency reset
   };
 
-  // Pipeline quick metrics
+  const handleExportCSV = async () => {
+    try {
+      const params = {};
+      if (search.trim()) params.search = search.trim();
+      if (status) params.status = status;
+      if (workMode) params.workMode = workMode;
+      const response = await exportService.downloadCSV(params);
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '_');
+      a.download = `applications_${dateStr}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setPage(newPage);
+  };
+
   const getStatsSummary = () => {
-    const total = applications.length;
     const interviews = applications.filter(a => a.status === 'Interview' || a.status === 'OA').length;
     const offers = applications.filter(a => a.status === 'Offer').length;
     const pending = applications.filter(a => a.status === 'Applied' || a.status === 'Shortlisted').length;
-    return { total, interviews, offers, pending };
+    return { total: totalCount, interviews, offers, pending };
   };
 
   const metrics = getStatsSummary();
@@ -114,13 +140,23 @@ const Dashboard = () => {
           </h1>
           <p className="text-sm text-gray-400 mt-1">Manage and track your placement process</p>
         </div>
-        <Link
-          to="/add"
-          className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-brand-primary hover:bg-brand-hover text-white text-sm font-semibold transition-all duration-200 shadow-lg shadow-indigo-500/20"
-        >
-          <Plus size={16} />
-          New Application
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-brand-border/40 hover:bg-brand-border/60 text-gray-300 hover:text-white text-sm font-semibold transition-all border border-brand-border/60"
+            title="Export applications as CSV"
+          >
+            <Download size={16} />
+            <span className="hidden sm:inline">Export CSV</span>
+          </button>
+          <Link
+            to="/add"
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-brand-primary hover:bg-brand-hover text-white text-sm font-semibold transition-all duration-200 shadow-lg shadow-indigo-500/20"
+          >
+            <Plus size={16} />
+            New Application
+          </Link>
+        </div>
       </div>
 
       {/* Mini Stats Banner */}
@@ -137,6 +173,34 @@ const Dashboard = () => {
           </div>
         ))}
       </div>
+
+      {roadmapStats && (
+        <div className="glass-panel rounded-2xl p-5 border border-brand-border/40 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-brand-secondary flex items-center justify-center shrink-0">
+              <Target size={24} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">Interview Readiness</h2>
+              <p className="text-sm text-gray-400">
+                {roadmapStats.completedTopics}/{roadmapStats.totalTopics} roadmap topics completed
+              </p>
+            </div>
+          </div>
+          <div className="w-full lg:max-w-md">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-400 font-medium">Overall preparation</span>
+              <span className="text-brand-secondary font-black">{roadmapStats.completionPercentage}%</span>
+            </div>
+            <div className="h-2.5 bg-brand-dark rounded-full overflow-hidden border border-brand-border/60">
+              <div
+                className="h-full bg-brand-secondary transition-all duration-300"
+                style={{ width: `${roadmapStats.completionPercentage}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar Panel */}
       <div className="glass-panel rounded-2xl p-5 border border-brand-border/40">
@@ -258,13 +322,53 @@ const Dashboard = () => {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {applications.map((app) => (
-            <div key={app.id} className="animate-slide-up">
-              <ApplicationCard application={app} />
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {applications.map((app) => (
+              <div key={app.id} className="animate-slide-up">
+                <ApplicationCard application={app} />
+              </div>
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-4 pt-4">
+              <p className="text-xs text-gray-500">
+                Page {page} of {totalPages} ({totalCount} total)
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page <= 1}
+                  className="p-2 rounded-xl bg-brand-dark border border-brand-border/60 text-gray-400 hover:text-white hover:border-brand-primary/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    className={`w-8 h-8 rounded-xl text-xs font-semibold transition-all ${
+                      p === page
+                        ? 'bg-brand-primary text-white'
+                        : 'bg-brand-dark border border-brand-border/60 text-gray-400 hover:text-white hover:border-brand-primary/30'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page >= totalPages}
+                  className="p-2 rounded-xl bg-brand-dark border border-brand-border/60 text-gray-400 hover:text-white hover:border-brand-primary/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  aria-label="Next page"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );

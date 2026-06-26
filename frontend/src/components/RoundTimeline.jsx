@@ -1,4 +1,3 @@
-import React from 'react';
 import { Calendar, Tag, FileText, CheckCircle2, Clock, XCircle, Edit, Trash2 } from 'lucide-react';
 
 const RoundTimeline = ({ rounds, onEditRound, onDeleteRound }) => {
@@ -34,11 +33,11 @@ const RoundTimeline = ({ rounds, onEditRound, onDeleteRound }) => {
   }
 
   return (
-    <div className="relative pl-6 space-y-8 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-brand-border">
+    <div className="relative pl-6 space-y-8 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-brand-border" role="list" aria-label="Interview rounds timeline">
       {rounds.map((round, idx) => (
-        <div key={round.id} className="relative group animate-slide-up" style={{ animationDelay: `${idx * 0.05}s` }}>
+        <div key={round.id} className="relative group animate-slide-up" style={{ animationDelay: `${idx * 0.05}s` }} role="listitem">
           {/* Marker Dot / Icon */}
-          <span className="absolute -left-[27px] top-1 flex h-6 w-6 items-center justify-center rounded-full bg-brand-dark border-2 border-brand-border group-hover:border-brand-primary transition-colors z-10">
+          <span className="absolute -left-[27px] top-1 flex h-6 w-6 items-center justify-center rounded-full bg-brand-dark border-2 border-brand-border group-hover:border-brand-primary transition-colors z-10" aria-hidden="true">
             {getStatusIcon(round.status)}
           </span>
 
@@ -51,11 +50,11 @@ const RoundTimeline = ({ rounds, onEditRound, onDeleteRound }) => {
                 </h4>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-400">
                   <span className="flex items-center gap-1">
-                    <Tag size={12} className="text-gray-500" />
+                    <Tag size={12} className="text-gray-500 shrink-0" aria-hidden="true" />
                     {round.round_type}
                   </span>
                   <span className="flex items-center gap-1">
-                    <Calendar size={12} className="text-gray-500" />
+                    <Calendar size={12} className="text-gray-500 shrink-0" aria-hidden="true" />
                     {formatDate(round.scheduled_at)}
                   </span>
                 </div>
@@ -70,25 +69,25 @@ const RoundTimeline = ({ rounds, onEditRound, onDeleteRound }) => {
                 `}>
                   {round.status}
                 </span>
-                
+
                 {/* Actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   {onEditRound && (
                     <button
                       onClick={() => onEditRound(round)}
                       className="p-1 rounded text-gray-400 hover:text-brand-primary hover:bg-brand-border transition-colors"
-                      title="Edit Round"
+                      aria-label={`Edit ${round.round_name}`}
                     >
-                      <Edit size={13} />
+                      <Edit size={13} aria-hidden="true" />
                     </button>
                   )}
                   {onDeleteRound && (
                     <button
                       onClick={() => onDeleteRound(round.id)}
                       className="p-1 rounded text-gray-400 hover:text-red-400 hover:bg-brand-border transition-colors"
-                      title="Delete Round"
+                      aria-label={`Delete ${round.round_name}`}
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={13} aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -98,7 +97,7 @@ const RoundTimeline = ({ rounds, onEditRound, onDeleteRound }) => {
             {/* Notes Section */}
             {round.notes && (
               <div className="mt-3 flex items-start gap-2 text-sm text-gray-300 bg-brand-border/20 rounded-xl p-3 border border-brand-border/30">
-                <FileText size={14} className="text-brand-secondary shrink-0 mt-0.5" />
+                <FileText size={14} className="text-brand-secondary shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="leading-relaxed whitespace-pre-line">{round.notes}</p>
               </div>
             )}

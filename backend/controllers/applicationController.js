@@ -1,4 +1,5 @@
 const db = require('../db');
+const { createRoadmapForApplication, ensureRoadmapsForUser } = require('./roadmapController');
 
 /**
  * @desc    Get all user applications (with Search, Filter, Sort)
@@ -7,75 +8,63 @@ const db = require('../db');
  */
 const getApplications = async (req, res, next) => {
   const userId = req.user.id;
-  const { search, status, workMode, sortBy, sortOrder } = req.query;
+  const { search, status, workMode, sortBy, sortOrder, page = '1', limit = '12' } = req.query;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 12));
+  const offset = (pageNum - 1) * limitNum;
 
   try {
-    let queryText = `
-      SELECT 
-        a.id, 
-        a.user_id, 
-        a.company_id, 
-        a.job_title, 
-        a.job_description, 
-        a.job_url, 
-        a.salary, 
-        a.location, 
-        a.work_mode, 
-        a.status, 
-        a.applied_date, 
-        a.deadline, 
-        a.resume_url, 
-        a.created_at, 
-        a.updated_at,
-        c.name AS company_name,
-        c.website AS company_website,
-        c.logo_url AS company_logo
-      FROM applications a
-      JOIN companies c ON a.company_id = c.id
-      WHERE a.user_id = $1
-    `;
-    
+    let whereClause = 'WHERE a.user_id = $1';
     const queryParams = [userId];
     let paramCounter = 2;
 
-    // Apply Search (Job Title or Company Name)
     if (search) {
-      queryText += ` AND (a.job_title ILIKE $${paramCounter} OR c.name ILIKE $${paramCounter})`;
+      whereClause += ` AND (a.job_title ILIKE $${paramCounter} OR c.name ILIKE $${paramCounter})`;
       queryParams.push(`%${search}%`);
       paramCounter++;
     }
 
-    // Apply Status Filter
     if (status) {
-      queryText += ` AND a.status = $${paramCounter}`;
+      whereClause += ` AND a.status = $${paramCounter}`;
       queryParams.push(status);
       paramCounter++;
     }
 
-    // Apply Work Mode Filter
     if (workMode) {
-      queryText += ` AND a.work_mode = $${paramCounter}`;
+      whereClause += ` AND a.work_mode = $${paramCounter}`;
       queryParams.push(workMode);
       paramCounter++;
     }
 
-    // Apply Sorting
     const allowedSortFields = ['applied_date', 'salary', 'deadline', 'created_at', 'company_name', 'job_title'];
     const activeSortField = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
     const activeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
 
-    if (activeSortField === 'company_name') {
-      queryText += ` ORDER BY c.name ${activeSortOrder}`;
-    } else {
-      queryText += ` ORDER BY a.${activeSortField} ${activeSortOrder}`;
-    }
+    const orderClause = activeSortField === 'company_name'
+      ? `ORDER BY c.name ${activeSortOrder}`
+      : `ORDER BY a.${activeSortField} ${activeSortOrder}`;
 
-    const result = await db.query(queryText, queryParams);
+    const [countResult, dataResult] = await Promise.all([
+      db.query(
+        `SELECT COUNT(*) as count FROM applications a JOIN companies c ON a.company_id = c.id ${whereClause}`,
+        queryParams
+      ),
+      db.query(
+        `SELECT a.id, a.user_id, a.company_id, a.job_title, a.job_description, a.job_url, a.salary, a.location, a.work_mode, a.status, a.applied_date, a.deadline, a.resume_url, a.created_at, a.updated_at, c.name AS company_name, c.website AS company_website, c.logo_url AS company_logo FROM applications a JOIN companies c ON a.company_id = c.id ${whereClause} ${orderClause} LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`,
+        [...queryParams, limitNum, offset]
+      ),
+    ]);
+
+    const totalCount = parseInt(countResult.rows[0].count, 10);
+    const totalPages = Math.ceil(totalCount / limitNum);
 
     return res.status(200).json({
       success: true,
-      count: result.rows.length,
-      applications: result.rows,
+      count: dataResult.rows.length,
+      totalCount,
+      page: pageNum,
+      totalPages,
+      applications: dataResult.rows,
     });
   } catch (error) {
     next(error);
@@ -190,6 +179,8 @@ const createApplication = async (req, res, next) => {
 
     const appResult = await db.query(insertAppQuery, appParams);
     const createdApp = appResult.rows[0];
+
+    await createRoadmapForApplication(createdApp);
 
     // Query application with company details for instant frontend sync
     const finalResult = await db.query(
@@ -360,49 +351,109 @@ const getApplicationStats = async (req, res, next) => {
   const userId = req.user.id;
 
   try {
-    // 1. Total Applications Count
-    const totalQuery = 'SELECT COUNT(*) as count FROM applications WHERE user_id = $1';
-    const totalRes = await db.query(totalQuery, [userId]);
+    await ensureRoadmapsForUser(userId);
+
+    const [
+      totalRes,
+      statusRes,
+      timelineRes,
+      companyRes,
+      roadmapTotalsRes,
+      weeklyRoadmapRes,
+      applicationReadinessRes,
+    ] = await Promise.all([
+      db.query('SELECT COUNT(*) as count FROM applications WHERE user_id = $1', [userId]),
+      db.query('SELECT status, COUNT(*) as count FROM applications WHERE user_id = $1 GROUP BY status', [userId]),
+      db.query(`
+        SELECT applied_date::text as date, COUNT(*) as count
+        FROM applications
+        WHERE user_id = $1
+        GROUP BY applied_date
+        ORDER BY applied_date ASC
+      `, [userId]),
+      db.query(`
+        SELECT c.name as company_name, COUNT(*) as count, COALESCE(AVG(a.salary), 0)::numeric(12,2) as avg_salary
+        FROM applications a
+        JOIN companies c ON a.company_id = c.id
+        WHERE a.user_id = $1
+        GROUP BY c.name
+        ORDER BY count DESC, avg_salary DESC
+        LIMIT 5
+      `, [userId]),
+      db.query(`
+        SELECT
+          COUNT(rt.id) AS total_topics,
+          COUNT(rt.id) FILTER (WHERE rt.is_completed = TRUE) AS completed_topics
+        FROM interview_roadmap_topics rt
+        JOIN applications a ON rt.application_id = a.id
+        WHERE a.user_id = $1
+      `, [userId]),
+      db.query(`
+        SELECT
+          rt.week_number,
+          COUNT(rt.id) AS total_topics,
+          COUNT(rt.id) FILTER (WHERE rt.is_completed = TRUE) AS completed_topics
+        FROM interview_roadmap_topics rt
+        JOIN applications a ON rt.application_id = a.id
+        WHERE a.user_id = $1
+        GROUP BY rt.week_number
+        ORDER BY rt.week_number ASC
+      `, [userId]),
+      db.query(`
+        SELECT
+          a.id,
+          a.job_title,
+          c.name AS company_name,
+          COUNT(rt.id) AS total_topics,
+          COUNT(rt.id) FILTER (WHERE rt.is_completed = TRUE) AS completed_topics
+        FROM applications a
+        JOIN companies c ON a.company_id = c.id
+        LEFT JOIN interview_roadmap_topics rt ON rt.application_id = a.id
+        WHERE a.user_id = $1
+        GROUP BY a.id, a.job_title, c.name
+        ORDER BY a.created_at DESC
+        LIMIT 5
+      `, [userId]),
+    ]);
+
     const totalApplications = parseInt(totalRes.rows[0].count, 10);
-
-    // 2. Status Distribution Count
-    const statusQuery = 'SELECT status, COUNT(*) as count FROM applications WHERE user_id = $1 GROUP BY status';
-    const statusRes = await db.query(statusQuery, [userId]);
-    const statusDistribution = statusRes.rows.map(r => ({
-      status: r.status,
-      count: parseInt(r.count, 10),
-    }));
-
-    // 3. Applications Over Time (grouped by applied_date)
-    const timelineQuery = `
-      SELECT applied_date::text as date, COUNT(*) as count 
-      FROM applications 
-      WHERE user_id = $1 
-      GROUP BY applied_date 
-      ORDER BY applied_date ASC
-    `;
-    const timelineRes = await db.query(timelineQuery, [userId]);
-    const timelineData = timelineRes.rows.map(r => ({
-      date: r.date,
-      count: parseInt(r.count, 10),
-    }));
-
-    // 4. Company Analytics (Application volumes and average salaries)
-    const companyStatsQuery = `
-      SELECT c.name as company_name, COUNT(*) as count, COALESCE(AVG(a.salary), 0)::numeric(12,2) as avg_salary
-      FROM applications a
-      JOIN companies c ON a.company_id = c.id
-      WHERE a.user_id = $1
-      GROUP BY c.name
-      ORDER BY count DESC, avg_salary DESC
-      LIMIT 5
-    `;
-    const companyRes = await db.query(companyStatsQuery, [userId]);
+    const statusDistribution = statusRes.rows.map(r => ({ status: r.status, count: parseInt(r.count, 10) }));
+    const timelineData = timelineRes.rows.map(r => ({ date: r.date, count: parseInt(r.count, 10) }));
     const companyData = companyRes.rows.map(r => ({
       companyName: r.company_name,
       count: parseInt(r.count, 10),
       avgSalary: parseFloat(r.avg_salary),
     }));
+
+    const totalRoadmapTopics = parseInt(roadmapTotalsRes.rows[0].total_topics, 10);
+    const completedRoadmapTopics = parseInt(roadmapTotalsRes.rows[0].completed_topics, 10);
+    const roadmapCompletionPercentage = totalRoadmapTopics === 0
+      ? 0
+      : Math.round((completedRoadmapTopics / totalRoadmapTopics) * 100);
+
+    const roadmapWeeklyProgress = weeklyRoadmapRes.rows.map(r => {
+      const totalTopics = parseInt(r.total_topics, 10);
+      const completedTopics = parseInt(r.completed_topics, 10);
+      return {
+        weekNumber: parseInt(r.week_number, 10),
+        totalTopics,
+        completedTopics,
+        completionPercentage: totalTopics === 0 ? 0 : Math.round((completedTopics / totalTopics) * 100),
+      };
+    });
+
+    const applicationReadiness = applicationReadinessRes.rows.map(r => {
+      const totalTopics = parseInt(r.total_topics, 10);
+      const completedTopics = parseInt(r.completed_topics, 10);
+      return {
+        id: r.id,
+        jobTitle: r.job_title,
+        companyName: r.company_name,
+        totalTopics,
+        completedTopics,
+        completionPercentage: totalTopics === 0 ? 0 : Math.round((completedTopics / totalTopics) * 100),
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -411,6 +462,13 @@ const getApplicationStats = async (req, res, next) => {
         statusDistribution,
         timelineData,
         companyData,
+        roadmapProgress: {
+          totalTopics: totalRoadmapTopics,
+          completedTopics: completedRoadmapTopics,
+          completionPercentage: roadmapCompletionPercentage,
+          weeklyProgress: roadmapWeeklyProgress,
+          applicationReadiness,
+        },
       },
     });
   } catch (error) {
